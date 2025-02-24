@@ -1,9 +1,12 @@
 {
+    "name": "daily-snapshot",
+    "version": "1.0.0",
+    "type": "module",
     "dependencies": {
-      "playwright-extra": "^4.x.x",
-      "puppeteer-extra-plugin-stealth": "^2.x.x",
       "@mozilla/readability": "^0.x.x",
+      "@supabase/supabase-js": "^2.x.x",
       "jsdom": "^x.x.x",
-      "@supabase/supabase-js": "^2.x.x"
+      "playwright-extra": "^4.x.x",
+      "puppeteer-extra-plugin-stealth": "^2.x.x"
     }
   }
