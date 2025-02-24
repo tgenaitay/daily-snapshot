@@ -2,11 +2,15 @@
     "name": "daily-snapshot",
     "version": "1.0.0",
     "type": "module",
+    "scripts": {
+      "start": "node snapshot-job.js"
+    },
     "dependencies": {
-      "@mozilla/readability": "^0.x.x",
-      "@supabase/supabase-js": "^2.x.x",
-      "jsdom": "^x.x.x",
-      "playwright-extra": "^4.x.x",
-      "puppeteer-extra-plugin-stealth": "^2.x.x"
+      "@mozilla/readability": "^0.4.4",
+      "@supabase/supabase-js": "^2.39.0",
+      "dotenv": "^16.4.5",
+      "jsdom": "^23.0.0",
+      "playwright-extra": "^4.0.2",
+      "puppeteer-extra-plugin-stealth": "^2.11.2"
     }
   }
