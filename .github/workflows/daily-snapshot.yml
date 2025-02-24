@@ -1,0 +1,40 @@
+name: Daily DOM Snapshot job
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every day at midnight UTC
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  take-snapshots:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Install Playwright browsers (Chromium in this case)
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      # Run the snapshot job with Supabase credentials from secrets
+      - name: Run daily snapshots
+        run: node snapshot-job.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+      # Optional: Notify on failure (e.g., via GitHub issue or Slack)
+      - name: Notify on failure
+        if: failure()
+        run: echo "Snapshot job failed - check logs for details"

@@ -1,0 +1,9 @@
+{
+    "dependencies": {
+      "playwright-extra": "^4.x.x",
+      "puppeteer-extra-plugin-stealth": "^2.x.x",
+      "@mozilla/readability": "^0.x.x",
+      "jsdom": "^x.x.x",
+      "@supabase/supabase-js": "^2.x.x"
+    }
+  }
