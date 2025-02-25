@@ -36,41 +36,4 @@ export class SourceService {
     if (error) throw error;
     return data;
   }
-
-  async addSource(url) {
-    const source = {
-      url,
-      is_active: true,
-      last_snapshot_at: null
-    };
-
-    const { data, error } = await supabase
-      .from('sources')
-      .insert([source])
-      .select();
-
-    if (error) throw error;
-    return data[0];
-  }
-
-  async updateSourceStatus(url, isActive) {
-    const { data, error } = await supabase
-      .from('sources')
-      .update({ is_active: isActive })
-      .eq('url', url)
-      .select();
-
-    if (error) throw error;
-    return data[0];
-  }
-
-  async deleteSource(id) {
-    const { data, error } = await supabase
-      .from('sources')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return { message: 'Source deleted successfully' };
-  }
 }
