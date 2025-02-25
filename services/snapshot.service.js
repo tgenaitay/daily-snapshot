@@ -158,83 +158,7 @@ export class SnapshotService {
 
   return snapshotData;
   }
-
-  async listSnapshots() {
-    const { data, error } = await supabase
-      .from('dom_snapshots')
-      .select('id, url, captured_at')
-      .order('captured_at', { ascending: false });
-
-    if (error) throw error;
-    return data.map(snapshot => ({
-      id: snapshot.id,
-      sourceUrl: snapshot.url,
-      source: { url: snapshot.url },
-      createdAt: snapshot.captured_at,
-      status: 'success' // Default status since we don't store failures
-    }));
-  }
-
-  async getSnapshotContent(id) {
-    const { data, error } = await supabase
-      .from('dom_snapshots')
-      .select('content')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async deleteSnapshot(id) {
-    const { data, error } = await supabase
-      .from('dom_snapshots')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return { message: 'Snapshot deleted successfully' };
-  }
-
-  async getSnapshotStats() {
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Get all snapshots
-    const { data: allSnapshots, error: allError } = await supabase
-      .from('dom_snapshots')
-      .select('id, url, captured_at');
-
-    if (allError) throw allError;
-
-    // Get today's snapshots
-    const { data: todaySnapshots, error: todayError } = await supabase
-      .from('dom_snapshots')
-      .select('id')
-      .gte('captured_at', today)
-      .lt('captured_at', today + 'T23:59:59.999Z');
-
-    if (todayError) throw todayError;
-
-    // Calculate total by source
-    const totalBySource = {};
-    allSnapshots.forEach(snapshot => {
-      if (!totalBySource[snapshot.url]) {
-        totalBySource[snapshot.url] = 0;
-      }
-      totalBySource[snapshot.url]++;
-    });
-
-    return {
-      total: allSnapshots.length,
-      totalToday: todaySnapshots.length,
-      totalBySource,
-      statusDistribution: {
-        success: allSnapshots.length, // Assuming all stored snapshots are successful
-        failed: 0 // We don't store failed snapshots currently
-      }
-    };
-  }
-
+}
   // async captureSnapshot(url) {
   //   const browser = await chromium.launch();
   //   let content = null;
@@ -438,5 +362,3 @@ export class SnapshotService {
   //   if (sourceError) throw sourceError;
   //   return data[0];
   // }
-
-}
