@@ -131,18 +131,32 @@ export class SnapshotService {
       throw new Error(`Failed to capture content after ${MAX_RETRIES} attempts`);
     }
 
-    const { data, error } = await supabase
-      .from('dom_snapshots')
-      .insert({
-        url,
-        content,
-        captured_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+  // Insert snapshot and update last_snapshot_at
+  const capturedAt = new Date().toISOString();
+  const { data: snapshotData, error: insertError } = await supabase
+    .from('dom_snapshots')
+    .insert({
+      url,
+      content,
+      captured_at: capturedAt
+    })
+    .select()
+    .single();
 
-    if (error) throw error;
-    return data;
+  if (insertError) throw insertError;
+
+  // Update last_snapshot_at in sources table
+  const { error: updateError } = await supabase
+    .from('sources')
+    .update({ last_snapshot_at: capturedAt })
+    .eq('url', url);
+
+  if (updateError) {
+    console.error(`Failed to update last_snapshot_at for ${url}:`, updateError);
+    throw updateError;
+  }
+
+  return snapshotData;
   }
 
   async listSnapshots() {
