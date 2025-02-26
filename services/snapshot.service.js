@@ -25,9 +25,22 @@ const supabase = createClient(
 
 // Configuration arrays for fingerprint variation
 const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  {
+    ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    platform: 'Win32'
+  },
+  {
+    ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    platform: 'MacIntel'
+  },
+  {
+    ua: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    platform: 'Linux x86_64'
+  },
+  {
+    ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0',
+    platform: 'Win32'
+  }
 ];
 
 const LOCALES = ['en-US', 'en-GB', 'en-CA'];
@@ -70,7 +83,10 @@ export class SnapshotService {
     const MAX_RETRIES = 5;
     console.log(`Let's go with ${url}...`);
     while (retryCount < MAX_RETRIES && !content) {
-      const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
+      const selected = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+      const userAgent = selected.ua;
+      const platform = selected.platform;
       const viewportWidth = 1920 + Math.floor(Math.random() * 100 - 50);
       const viewportHeight = 1080 + Math.floor(Math.random() * 60 - 30);
       const locale = LOCALES[Math.floor(Math.random() * LOCALES.length)];
@@ -90,7 +106,7 @@ export class SnapshotService {
       });
 
       // Advanced fingerprint evasion
-      await context.addInitScript(() => {
+      await context.addInitScript((platform) => {
         Object.defineProperty(navigator, 'webdriver', { get: () => false });
         Object.defineProperty(navigator, 'plugins', {
           get: () => [{
@@ -103,9 +119,9 @@ export class SnapshotService {
           get: () => [locale.split('-')[0], locale]
         });
         Object.defineProperty(navigator, 'platform', {
-          get: () => ['Win32', 'MacIntel', 'Linux x86_64'][Math.floor(Math.random() * 3)]
+          get: () => platform
         });
-      });
+      }, platform);
 
       const page = await context.newPage();
       try {
