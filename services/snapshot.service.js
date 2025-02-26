@@ -3,6 +3,7 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import { createClient } from '@supabase/supabase-js';
+import minifyHtml from '@minify-html/node';
 
 // Only load dotenv if running locally (optional)
 if (process.env.NODE_ENV !== 'production') {
@@ -116,7 +117,19 @@ export class SnapshotService {
           keepClasses: false // Disable class retention
         });
         const changes = reader.parse();
-        content = changes ? JSON.stringify(changes) : pageContent;
+
+        if (changes) {
+          changes.content = minifyHtml.minify(Buffer.from(changes.content), {
+            keep_spaces_between_attributes: false,
+            keep_comments: false
+          }).toString();
+          content = JSON.stringify(changes);
+        } else {
+          content = minifyHtml.minify(Buffer.from(pageContent), {
+            keep_spaces_between_attributes: false,
+            keep_comments: false
+          }).toString();
+        }
         console.log(`Content = ${content.substring(0, 50)}...`);
       } catch (error) {
         console.error(`Failed to capture content on attempt ${retryCount + 1}:`, error);
