@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Conditional dotenv for local dev only
+// Only load dotenv if running locally (optional)
 if (process.env.NODE_ENV !== 'production') {
-  import('dotenv').then(dotenv => dotenv.config());
+  const dotenv = await import('dotenv');
+  dotenv.config();
 }
 
 const supabase = createClient(

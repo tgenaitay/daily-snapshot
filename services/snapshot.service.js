@@ -6,7 +6,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // Only load dotenv if running locally (optional)
 if (process.env.NODE_ENV !== 'production') {
-  import('dotenv').then(dotenv => dotenv.config());
+  const dotenv = await import('dotenv');
+  dotenv.config();
 }
 chromium.use(stealth());
 
@@ -66,7 +67,7 @@ export class SnapshotService {
     let content = null;
     let retryCount = 0;
     const MAX_RETRIES = 5;
-
+    console.log(`Let's go with ${url}...`);
     while (retryCount < MAX_RETRIES && !content) {
       const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
       const viewportWidth = 1920 + Math.floor(Math.random() * 100 - 50);
@@ -116,6 +117,7 @@ export class SnapshotService {
         });
         const changes = reader.parse();
         content = changes ? JSON.stringify(changes) : pageContent;
+        console.log(`Content = ${content.substring(0, 50)}...`);
       } catch (error) {
         console.error(`Failed to capture content on attempt ${retryCount + 1}:`, error);
         retryCount++;
