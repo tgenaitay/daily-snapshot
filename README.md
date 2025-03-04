@@ -3,7 +3,7 @@
 
 A lightweight service that captures daily content snapshots of specified web pages, stores them in Supabase, and runs automatically via GitHub Actions. Built with Node.js, Playwright, JSDOM and the Supabase JavaScript client. This project is designed to be cost-efficient, and easy to maintain.
 
-Still trial testing Mozilla's Readability and Trafilatura for parsing and content filtering, aiming to get the best precision for 99% of sources.
+Currently using Mozilla's Readability for parsing and content filtering, aiming to get the best precision for 99% of sources.
 
 ## Features
 
@@ -16,7 +16,7 @@ Still trial testing Mozilla's Readability and Trafilatura for parsing and conten
 
 - Sources: A list of URLs is stored in a Supabase table (sources) with an is_active flag.
 - Snapshot Job: Every day at 00:00 UTC, a GitHub Actions workflow runs snapshot-job.js.
-- Capture: Playwright fetches each active source, processes it with Readability/Trafilatura, and stores the result in Supabase (dom_snapshots).
+- Capture: Playwright fetches each active source, processes it with Readability, and stores the result in Supabase (dom_snapshots).
 - Manual Trigger: Use the GitHub Actions UI to run the job on-demand.
 
 ## Prerequisites

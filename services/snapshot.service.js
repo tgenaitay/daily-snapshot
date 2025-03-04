@@ -1,15 +1,8 @@
 import { chromium } from 'playwright-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
-// import { Readability } from '@mozilla/readability';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs/promises';
-import path from 'path';
+import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import { createClient } from '@supabase/supabase-js';
-import { constants } from 'perf_hooks';
-
-const execPromise = promisify(exec);
 
 // Only load dotenv if running locally (optional)
 if (process.env.NODE_ENV !== 'production') {
@@ -73,14 +66,7 @@ export class SnapshotService {
     const browser = await chromium.launch({
       headless: true,
       args: [
-        // '--disable-blink-features=AutomationControlled',
-        // '--disable-features=IsolateOrigins,site-per-process',
         '--no-sandbox'
-        // '--disable-web-security',
-        // '--disable-dev-shm-usage',
-        // '--disable-accelerated-2d-canvas',
-        // '--disable-gpu',
-        // '--hide-scrollbars'
       ]
     });
 
@@ -133,79 +119,35 @@ export class SnapshotService {
       try {
         await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
         const pageContent = await page.content();
+        const dom = new JSDOM(pageContent);
+        const title = dom.window.document.title || 'Unknown Title';        
+        // Use Readability extraction
+        const reader = new Readability(dom.window.document, {
+          charThreshold: 500,
+          keepClasses: false
+        });
+        const article = reader.parse();
 
-        // Save HTML to temp file
-        const tempDir = path.join(process.cwd(), 'temp');
-        await fs.mkdir(tempDir, { recursive: true });
-        const tempFile = path.join(tempDir, `page-${Date.now()}.html`);
-        await fs.writeFile(tempFile, pageContent);
-        try {
-          // Call Trafilatura via Python
-          const { stdout } = await execPromise(
-            `python3 -c "import trafilatura; f = open('${tempFile}', 'r', encoding='utf-8'); content = f.read(); f.close(); print(trafilatura.extract(content, output_format='markdown', include_comments=False, include_tables=True, date_extraction_params={'extensive_search': True}))"`,
-            { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer
-          );
-          
-          // Get more content separately
-          const dom = new JSDOM(pageContent);
-          const title = dom.window.document.title || 'Unknown Title';
-          // const reader = new Readability(dom.window.document, {
-          //   charThreshold: 500, // Minimum content length
-          //   keepClasses: false // Disable class retention
-          // });
-          // const article = reader.parse();  
-          // if (article) {   
-          //   const filteredContent = article.textContent;
-          // }
-          // else {
-          //   const filteredContent = new JSDOM(pageContent).window.document.body.textContent.trim();
-          // }
-          
+        if (article) {
+          content = JSON.stringify({
+            title: article.title || title,
+            textContent: article.textContent,
+            length: article.length
+          });
+        } else {
+          // Fallback to basic text extraction
+          const fallbackContent = dom.window.document.body.textContent.trim();
           content = JSON.stringify({
             title: title,
-            markdown: stdout.trim()
+            textContent: fallbackContent,
+            length: fallbackContent.length
           });
-          
-          // Clean up temp file
-          await fs.unlink(tempFile);
-        } catch (trafilaturaError) {
-          console.error('Trafilatura extraction failed:', trafilaturaError);
-          // Fall back to Readability
-          // ... existing Readability code ...
         }
-        // // READABILITY APPROACH IS SKIPPING DATES OR CONTENT
-        // // SOMEWHAT OK BUT UNRELIABLE AT TIMES
 
-        // const dom = new JSDOM(pageContent);
-        // const reader = new Readability(dom.window.document, {
-        //   charThreshold: 500, // Minimum content length
-        //   keepClasses: false // Disable class retention
-        // });
-        // const article = reader.parse();
-
-        // if (article) {
-        //   // Extract only the desired fields
-        //   const filteredContent = {
-        //     title: article.title,
-        //     textContent: article.textContent,
-        //     length: article.length
-        //   };
-        //   content = JSON.stringify(filteredContent);
-        // } else {
-        //   // Fallback: if Readability fails, use plain page content and strip tags manually
-        //   const fallbackDoc = new JSDOM(pageContent).window.document.body.textContent.trim();
-        //   content = JSON.stringify({
-        //     title: dom.window.document.title || 'Unknown Title',
-        //     textContent: fallbackDoc,
-        //     length: fallbackDoc.length
-        //   });
-        // }
-          if (content) {
-            console.log(`Content = ${content.substring(0, 50)}...`);
-          } else {
-            console.log('No content extracted in this attempt');
-          }
-        } catch (error) {
+        if (content) {
+          console.log(`Content = ${content.substring(0, 50)}...`);
+        }
+      } catch (error) {
         console.error(`Failed to capture content on attempt ${retryCount + 1}:`, error);
         retryCount++;
         await page.close();
@@ -248,206 +190,3 @@ export class SnapshotService {
   return snapshotData;
   }
 }
-  // async captureSnapshot(url) {
-  //   const browser = await chromium.launch();
-  //   let content = null;
-  //   let retryCount = 0;
-  //   const maxRetries = 3;
-    
-  //   while (retryCount < maxRetries) {
-  //     const context = await browser.newContext();
-  //     const page = await context.newPage();
-  //     try {
-  //       await page.goto(url, { waitUntil: 'networkidle0' });
-    
-  //       // Wait for initial page load
-  //       await page.waitForTimeout(2000);
-    
-  //       // Enhanced React content detection with additional checks
-  //       await page.evaluate(async () => {
-  //         return new Promise((resolve) => {
-  //           let hydrationComplete = false;
-  //           let networkQuiet = false;
-  //           let mutationsStopped = false;
-            
-  //           // Track React hydration completion with additional checks
-  //           const checkHydration = () => {
-  //             // Check for root element
-  //             const root = document.getElementById('root');
-  //             if (!root) return;
-    
-  //             // Check for React-specific properties
-  //             const hasReactProps = Object.keys(root).some(key => 
-  //               key.startsWith('__react') || key.startsWith('_reactRootContainer'));
-              
-  //             // Check for React DevTools
-  //             const hasReactDevTools = window.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== undefined;
-              
-  //             // Check for rendered content
-  //             const hasContent = root.children.length > 0 || root.innerHTML.trim().length > 0;
-              
-  //             // Additional React state checks
-  //             const hasReactState = !!window._reactRootContainer || 
-  //                             !!document.querySelector('[data-reactroot]') ||
-  //                             !!root._reactRootContainer ||
-  //                             (window.__REACT_DEVTOOLS_GLOBAL_HOOK__ && 
-  //                              window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers && 
-  //                              window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers.size > 0);
-              
-  //             if (hasContent || hasReactProps || hasReactDevTools || hasReactState) {
-  //               hydrationComplete = true;
-  //               checkAllConditions();
-  //             }
-  //           };
-    
-  //           // Monitor network activity
-  //           let pendingRequests = 0;
-  //           const originalFetch = window.fetch;
-  //           const originalXHR = window.XMLHttpRequest.prototype.send;
-    
-  //           window.fetch = async (...args) => {
-  //             pendingRequests++;
-  //             try {
-  //               const response = await originalFetch.apply(window, args);
-  //               return response;
-  //             } finally {
-  //               pendingRequests--;
-  //               if (pendingRequests === 0) {
-  //                 networkQuiet = true;
-  //                 checkAllConditions();
-  //               }
-  //             }
-  //           };
-    
-  //           window.XMLHttpRequest.prototype.send = function(...args) {
-  //             pendingRequests++;
-  //             this.addEventListener('loadend', () => {
-  //               pendingRequests--;
-  //               if (pendingRequests === 0) {
-  //                 networkQuiet = true;
-  //                 checkAllConditions();
-  //               }
-  //             });
-  //             return originalXHR.apply(this, args);
-  //           };
-    
-  //           // Monitor DOM mutations
-  //           let mutationCount = 0;
-  //           let lastMutationTime = Date.now();
-  //           const observer = new MutationObserver((mutations) => {
-  //             mutationCount += mutations.length;
-  //             lastMutationTime = Date.now();
-  //             checkHydration();
-  //           });
-    
-  //           observer.observe(document.documentElement, {
-  //             childList: true,
-  //             subtree: true,
-  //             attributes: true,
-  //             characterData: true
-  //           });
-    
-  //           // Check if mutations have stopped
-  //           const checkMutations = () => {
-  //             const timeSinceLastMutation = Date.now() - lastMutationTime;
-  //             if (timeSinceLastMutation > 1000 && mutationCount > 0) {
-  //               mutationsStopped = true;
-  //               checkAllConditions();
-  //             }
-  //           };
-    
-  //           // Combined conditions check
-  //           const checkAllConditions = () => {
-  //             if ((hydrationComplete || mutationsStopped) && networkQuiet) {
-  //               observer.disconnect();
-  //               window.fetch = originalFetch;
-  //               window.XMLHttpRequest.prototype.send = originalXHR;
-  //               resolve();
-  //             }
-  //           };
-    
-  //           // Initial hydration check
-  //           checkHydration();
-    
-  //           // Set up periodic checks
-  //           const periodicCheck = setInterval(() => {
-  //             checkHydration();
-  //             checkMutations();
-  //           }, 100);
-    
-  //           // Fallback timeout
-  //           setTimeout(() => {
-  //             clearInterval(periodicCheck);
-  //             observer.disconnect();
-  //             window.fetch = originalFetch;
-  //             window.XMLHttpRequest.prototype.send = originalXHR;
-  //             resolve();
-  //           }, 30000);
-  //         });
-  //       });
-    
-  //       // Simulate human-like scrolling behavior
-  //       await page.evaluate(() => {
-  //         const scrollHeight = document.documentElement.scrollHeight;
-  //         let currentScroll = 0;
-  //         const scrollStep = Math.floor(Math.random() * 100) + 50;
-          
-  //         const smoothScroll = setInterval(() => {
-  //           if (currentScroll >= scrollHeight) {
-  //             clearInterval(smoothScroll);
-  //             return;
-  //           }
-  //           window.scrollBy(0, scrollStep);
-  //           currentScroll += scrollStep;
-  //         }, 100);
-  //       });
-    
-  //       const isChallenge = await page.evaluate(() => {
-  //         return document.querySelector('div#cf-challenge-running') !== null;
-  //       });
-    
-  //       if (isChallenge) {
-  //         console.log(`Cloudflare challenge detected, attempt ${retryCount + 1}`);
-  //         await page.waitForTimeout(15000 * Math.pow(2, retryCount));
-  //         retryCount++;
-  //       } else {
-  //         content = await page.content();
-  //         break;
-  //       }
-  //     } catch (error) {
-  //       console.error(`Attempt ${retryCount + 1} failed: ${error.message}`);
-  //       retryCount++;
-  //     } finally {
-  //       await page.close();
-  //       await context.close();
-  //     }
-  //   }
-
-  //   if (!content) {
-  //     await browser.close();
-  //     throw new Error('Failed to capture content after maximum retries');
-  //   }
-
-  //   await browser.close();
-  //   const snapshot = {
-  //     url,
-  //     content,
-  //     captured_at: new Date().toISOString()
-  //   };
-
-  //   const { data, error: snapshotError } = await supabase
-  //     .from('dom_snapshots')
-  //     .insert([snapshot])
-  //     .select();
-
-  //   if (snapshotError) throw snapshotError;
-
-  //   // Update the source's last_snapshot_at
-  //   const { error: sourceError } = await supabase
-  //     .from('sources')
-  //     .update({ last_snapshot_at: snapshot.captured_at })
-  //     .eq('url', url);
-
-  //   if (sourceError) throw sourceError;
-  //   return data[0];
-  // }
