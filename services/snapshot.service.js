@@ -1,9 +1,15 @@
 import { chromium } from 'playwright-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
-import { Readability } from '@mozilla/readability';
+// import { Readability } from '@mozilla/readability';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
 import { JSDOM } from 'jsdom';
 import { createClient } from '@supabase/supabase-js';
-import minifyHtml from '@minify-html/node';
+import { constants } from 'perf_hooks';
+
+const execPromise = promisify(exec);
 
 // Only load dotenv if running locally (optional)
 if (process.env.NODE_ENV !== 'production') {
@@ -127,27 +133,79 @@ export class SnapshotService {
       try {
         await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
         const pageContent = await page.content();
-        const dom = new JSDOM(pageContent);
-        const reader = new Readability(dom.window.document, {
-          charThreshold: 500, // Minimum content length
-          keepClasses: false // Disable class retention
-        });
-        const changes = reader.parse();
 
-        if (changes) {
-          changes.content = minifyHtml.minify(Buffer.from(changes.content), {
-            keep_spaces_between_attributes: false,
-            keep_comments: false
-          }).toString();
-          content = JSON.stringify(changes);
-        } else {
-          content = minifyHtml.minify(Buffer.from(pageContent), {
-            keep_spaces_between_attributes: false,
-            keep_comments: false
-          }).toString();
+        // Save HTML to temp file
+        const tempDir = path.join(process.cwd(), 'temp');
+        await fs.mkdir(tempDir, { recursive: true });
+        const tempFile = path.join(tempDir, `page-${Date.now()}.html`);
+        await fs.writeFile(tempFile, pageContent);
+        try {
+          // Call Trafilatura via Python
+          const { stdout } = await execPromise(
+            `python3 -c "import trafilatura; f = open('${tempFile}', 'r', encoding='utf-8'); content = f.read(); f.close(); print(trafilatura.extract(content, output_format='markdown', include_comments=False, include_tables=True, date_extraction_params={'extensive_search': True}))"`,
+            { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer
+          );
+          
+          // Get more content separately
+          const dom = new JSDOM(pageContent);
+          const title = dom.window.document.title || 'Unknown Title';
+          // const reader = new Readability(dom.window.document, {
+          //   charThreshold: 500, // Minimum content length
+          //   keepClasses: false // Disable class retention
+          // });
+          // const article = reader.parse();  
+          // if (article) {   
+          //   const filteredContent = article.textContent;
+          // }
+          // else {
+          //   const filteredContent = new JSDOM(pageContent).window.document.body.textContent.trim();
+          // }
+          
+          content = JSON.stringify({
+            title: title,
+            markdown: stdout.trim()
+          });
+          
+          // Clean up temp file
+          await fs.unlink(tempFile);
+        } catch (trafilaturaError) {
+          console.error('Trafilatura extraction failed:', trafilaturaError);
+          // Fall back to Readability
+          // ... existing Readability code ...
         }
-        console.log(`Content = ${content.substring(0, 50)}...`);
-      } catch (error) {
+        // // READABILITY APPROACH IS SKIPPING DATES OR CONTENT
+        // // SOMEWHAT OK BUT UNRELIABLE AT TIMES
+
+        // const dom = new JSDOM(pageContent);
+        // const reader = new Readability(dom.window.document, {
+        //   charThreshold: 500, // Minimum content length
+        //   keepClasses: false // Disable class retention
+        // });
+        // const article = reader.parse();
+
+        // if (article) {
+        //   // Extract only the desired fields
+        //   const filteredContent = {
+        //     title: article.title,
+        //     textContent: article.textContent,
+        //     length: article.length
+        //   };
+        //   content = JSON.stringify(filteredContent);
+        // } else {
+        //   // Fallback: if Readability fails, use plain page content and strip tags manually
+        //   const fallbackDoc = new JSDOM(pageContent).window.document.body.textContent.trim();
+        //   content = JSON.stringify({
+        //     title: dom.window.document.title || 'Unknown Title',
+        //     textContent: fallbackDoc,
+        //     length: fallbackDoc.length
+        //   });
+        // }
+          if (content) {
+            console.log(`Content = ${content.substring(0, 50)}...`);
+          } else {
+            console.log('No content extracted in this attempt');
+          }
+        } catch (error) {
         console.error(`Failed to capture content on attempt ${retryCount + 1}:`, error);
         retryCount++;
         await page.close();
